@@ -3,7 +3,6 @@ use proc_ctl::PortQuery;
 use retry::delay::Fixed;
 use retry::retry;
 use std::process::Command;
-use std::time::Duration;
 
 #[test]
 fn port_query() {
@@ -42,8 +41,34 @@ fn port_query_which_expects_too_many_ports() {
     result.expect_err("Should have had an error about too few ports");
 }
 
+#[cfg(feature = "resilience")]
 #[test]
-fn built_in_retry() {
+fn port_query_with_sync_retry() {
+    use std::time::Duration;
+
+    let mut binder = Command::cargo_bin("port-binder").unwrap();
+    let mut handle = binder.spawn().unwrap();
+
+    let query = PortQuery::new()
+        .tcp_only()
+        .ip_v4_only()
+        .process_id_from_child(&handle)
+        .expect_min_num_ports(1);
+
+    let ports = query
+        .execute_with_retry_sync(Duration::from_millis(100), 10)
+        .unwrap();
+
+    handle.kill().unwrap();
+
+    assert_eq!(1, ports.len());
+}
+
+#[cfg(feature = "async")]
+#[tokio::test]
+async fn port_query_with_async_retry() {
+    use std::time::Duration;
+
     let mut binder = Command::cargo_bin("port-binder").unwrap();
     let mut handle = binder.spawn().unwrap();
 
@@ -55,6 +80,7 @@ fn built_in_retry() {
 
     let ports = query
         .execute_with_retry(Duration::from_millis(100), 10)
+        .await
         .unwrap();
 
     handle.kill().unwrap();

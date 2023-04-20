@@ -72,8 +72,8 @@ impl PortQuery {
         Ok(ports)
     }
 
-    #[cfg(feature = "retry")]
-    pub fn execute_with_retry(
+    #[cfg(feature = "resilience")]
+    pub fn execute_with_retry_sync(
         &self,
         delay: std::time::Duration,
         count: usize,
@@ -82,6 +82,26 @@ impl PortQuery {
             self.execute()
         })
         .map_err(|e| e.error)
+    }
+
+    #[cfg(feature = "async")]
+    #[async_recursion::async_recursion]
+    pub async fn execute_with_retry(
+        &self,
+        delay: std::time::Duration,
+        count: usize,
+    ) -> ProcCtlResult<Vec<ProtocolPort>> {
+        match self.execute() {
+            Ok(ports) => Ok(ports),
+            Err(e) => {
+                if count <= 0 {
+                    return Err(e);
+                } else {
+                    tokio::time::sleep(delay).await;
+                    return self.execute_with_retry(delay, count - 1).await;
+                }
+            }
+        }
     }
 
     fn resolve_pid(&self) -> ProcCtlResult<Pid> {
