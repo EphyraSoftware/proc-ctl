@@ -109,11 +109,11 @@ impl PortQuery {
         match self.execute() {
             Ok(ports) => Ok(ports),
             Err(e) => {
-                if count <= 0 {
-                    return Err(e);
+                if count == 0 {
+                    Err(e)
                 } else {
                     tokio::time::sleep(delay).await;
-                    return self.execute_with_retry(delay, count - 1).await;
+                    self.execute_with_retry(delay, count - 1).await
                 }
             }
         }

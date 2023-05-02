@@ -20,3 +20,5 @@ jobs:
       run: cargo build
     - name: Run tests
       run: ./run_tests.sh
+    - name: Lint
+      run: cargo clippy --all-features
