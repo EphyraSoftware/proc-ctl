@@ -1,6 +1,6 @@
 ## proc-ctl
 
-A helper library for querying and manipulating processes/
+A helper library for querying and manipulating processes.
 
 ### Find what port a process is using
 

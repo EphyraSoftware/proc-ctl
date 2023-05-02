@@ -1,4 +1,7 @@
+/// A process ID
 pub type Pid = u32;
+
+/// A port
 pub type Port = u16;
 
 /// A representation of a port using a specific protocol

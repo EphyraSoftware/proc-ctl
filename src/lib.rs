@@ -1,6 +1,9 @@
-pub mod error;
+#![deny(missing_docs)]
+#![doc = include_str!("../README.md")]
+
+mod error;
 mod port_query;
-pub mod types;
+mod types;
 
 pub use crate::error::{ProcCtlError, ProcCtlResult};
 pub use crate::port_query::PortQuery;
