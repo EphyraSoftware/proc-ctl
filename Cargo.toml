@@ -7,10 +7,6 @@ license = "MPL-2.0"
 repository = "https://github.com/EphyraSoftware/proc-ctl"
 
 [[bin]]
-name = "proc-ctl"
-path = "./cli/main.rs"
-
-[[bin]]
 name = "port-binder"
 path = "./sample/port-binder/main.rs"
 
