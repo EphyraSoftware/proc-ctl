@@ -7,4 +7,4 @@ mod types;
 
 pub use crate::error::{ProcCtlError, ProcCtlResult};
 pub use crate::port_query::PortQuery;
-pub use types::*;
+pub use crate::types::*;
