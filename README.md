@@ -15,3 +15,15 @@ let query = PortQuery::new()
 
 query.execute().unwrap();
 ```
+
+### Find the children of a given process
+
+```rust no_run
+use proc_ctl::ProcQuery;
+
+let query = ProcQuery::new()
+        .process_id(55932) // Get a process ID from somewhere
+        .expect_min_num_children(1);
+
+query.children().unwrap();
+```
