@@ -17,5 +17,9 @@ pub enum ProcCtlError {
 
     /// Fewer ports than expected were found on the matched process
     #[error("too few ports, got {0:?} but expected {1}")]
-    TooFewPorts(Vec<ProtocolPort>, u32),
+    TooFewPorts(Vec<ProtocolPort>, usize),
+
+    /// Too few children were found on the matched process
+    #[error("too few children, got {0} but expected {1}")]
+    TooFewChildren(usize, usize),
 }

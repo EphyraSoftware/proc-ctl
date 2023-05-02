@@ -1,15 +1,16 @@
-use crate::error::ProcCtlError::ConfigurationError;
+use crate::common::{resolve_pid, MaybeHasPid};
 use crate::error::{ProcCtlError, ProcCtlResult};
 use crate::types::{Pid, ProtocolPort};
 use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState};
 use std::process::Child;
 
 /// Find the ports used by a process
+#[derive(Debug)]
 pub struct PortQuery {
     address_family_flags: AddressFamilyFlags,
     proto_flags: ProtocolFlags,
     process_id: Option<Pid>,
-    min_num_ports: Option<u32>,
+    min_num_ports: Option<usize>,
 }
 
 impl PortQuery {
@@ -48,7 +49,7 @@ impl PortQuery {
     }
 
     /// Require at least `num_ports` ports to be bound by the matched process for the query to succeed.
-    pub fn expect_min_num_ports(mut self, num_ports: u32) -> Self {
+    pub fn expect_min_num_ports(mut self, num_ports: usize) -> Self {
         self.min_num_ports = Some(num_ports);
         self
     }
@@ -73,11 +74,11 @@ impl PortQuery {
         let ports = list_ports_for_pid(
             self.address_family_flags,
             self.proto_flags,
-            self.resolve_pid()?,
+            resolve_pid(self)?,
         )?;
 
         if let Some(num) = &self.min_num_ports {
-            if ports.len() < *num as usize {
+            if ports.len() < *num {
                 return Err(ProcCtlError::TooFewPorts(ports, *num));
             }
         }
@@ -85,7 +86,7 @@ impl PortQuery {
         Ok(ports)
     }
 
-    /// Execute the query the query and retry until it succeeds or exhausts the configured retries
+    /// Execute the query and retry until it succeeds or exhausts the configured retries
     #[cfg(feature = "resilience")]
     pub fn execute_with_retry_sync(
         &self,
@@ -118,14 +119,6 @@ impl PortQuery {
             }
         }
     }
-
-    fn resolve_pid(&self) -> ProcCtlResult<Pid> {
-        if let Some(pid) = &self.process_id {
-            return Ok(*pid);
-        }
-
-        Err(ConfigurationError("unable to resolve a pid".to_string()))
-    }
 }
 
 fn list_ports_for_pid(
@@ -154,6 +147,12 @@ fn list_ports_for_pid(
             }
         })
         .collect()
+}
+
+impl MaybeHasPid for PortQuery {
+    fn get_pid(&self) -> Option<Pid> {
+        self.process_id
+    }
 }
 
 impl Default for PortQuery {
