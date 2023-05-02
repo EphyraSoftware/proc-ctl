@@ -2,6 +2,9 @@
 name = "proc-ctl"
 version = "0.1.0"
 edition = "2021"
+description = "A helper library for querying and manipulating processes"
+license = "MPL-2.0"
+repository = "https://github.com/EphyraSoftware/proc-ctl"
 
 [[bin]]
 name = "proc-ctl"

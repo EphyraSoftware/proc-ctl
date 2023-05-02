@@ -13,6 +13,7 @@ pub struct PortQuery {
 }
 
 impl PortQuery {
+    /// Create a new query
     pub fn new() -> Self {
         PortQuery {
             address_family_flags: AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6,
@@ -22,40 +23,52 @@ impl PortQuery {
         }
     }
 
+    /// Only consider IPv4 addresses
     pub fn ip_v4_only(mut self) -> Self {
         self.address_family_flags = AddressFamilyFlags::IPV4;
         self
     }
 
+    /// Only consider IPv6 addresses
     pub fn ip_v6_only(mut self) -> Self {
         self.address_family_flags = AddressFamilyFlags::IPV6;
         self
     }
 
+    /// Only consider TCP ports
     pub fn tcp_only(mut self) -> Self {
         self.proto_flags = ProtocolFlags::TCP;
         self
     }
 
+    /// Only consider UDP ports
     pub fn udp_only(mut self) -> Self {
         self.proto_flags = ProtocolFlags::UDP;
         self
     }
 
+    /// Require at least `num_ports` ports to be bound by the matched process for the query to succeed.
     pub fn expect_min_num_ports(mut self, num_ports: u32) -> Self {
         self.min_num_ports = Some(num_ports);
         self
     }
 
+    /// Set the process ID to match
+    ///
+    /// Either this function or `process_id_from_child` are required to be called before the query is usable.
     pub fn process_id(mut self, pid: Pid) -> Self {
         self.process_id = Some(pid);
         self
     }
 
+    /// Get the process ID of a child process
+    ///
+    /// Either this function or `process_id` are required to be called before the query is usable.
     pub fn process_id_from_child(self, child: &Child) -> Self {
         self.process_id(child.id())
     }
 
+    /// Execute the query the query
     pub fn execute(&self) -> ProcCtlResult<Vec<ProtocolPort>> {
         let ports = list_ports_for_pid(
             self.address_family_flags,
@@ -72,6 +85,7 @@ impl PortQuery {
         Ok(ports)
     }
 
+    /// Execute the query the query and retry until it succeeds or exhausts the configured retries
     #[cfg(feature = "resilience")]
     pub fn execute_with_retry_sync(
         &self,
@@ -84,6 +98,7 @@ impl PortQuery {
         .map_err(|e| e.error)
     }
 
+    /// Async equivalent of `execute_with_retry_sync`
     #[cfg(feature = "async")]
     #[async_recursion::async_recursion]
     pub async fn execute_with_retry(
