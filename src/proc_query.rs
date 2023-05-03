@@ -67,7 +67,8 @@ impl ProcQuery {
     pub fn children(&self) -> ProcCtlResult<Vec<ProcInfo>> {
         let pid = resolve_pid(self)?;
 
-        let sys_handle = sys_handle().lock().unwrap();
+        let mut sys_handle = sys_handle().lock().unwrap();
+        sys_handle.refresh_processes();
         let processes = sys_handle.processes();
         let children: Vec<ProcInfo> = processes
             .values()
@@ -121,18 +122,14 @@ impl ProcQuery {
 
 fn sys_handle() -> &'static Mutex<System> {
     static SYS_HANDLE: OnceCell<Mutex<System>> = OnceCell::new();
-    let handle = SYS_HANDLE.get_or_init(|| {
+    SYS_HANDLE.get_or_init(|| {
         let mut sys = System::new_with_specifics(
             RefreshKind::new().with_processes(ProcessRefreshKind::new()),
         );
         sys.refresh_processes();
 
         Mutex::new(sys)
-    });
-
-    handle.lock().unwrap().refresh_processes();
-
-    handle
+    })
 }
 
 impl From<&Process> for ProcInfo {
