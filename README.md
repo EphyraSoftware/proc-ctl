@@ -16,14 +16,32 @@ let query = PortQuery::new()
 query.execute().unwrap();
 ```
 
+### Find processes by name
+
+```rust no_run
+use proc_ctl::{ProcCtlResult, ProcQuery};
+
+fn main() -> ProcCtlResult<()> {
+
+    let query = ProcQuery::new()
+        .process_name("firefox");
+
+    let processes = query.list_processes()?;
+    Ok(())
+}
+```
+
 ### Find the children of a given process
 
 ```rust no_run
-use proc_ctl::ProcQuery;
+use proc_ctl::{ProcCtlResult, ProcQuery};
 
-let query = ProcQuery::new()
+fn main() -> ProcCtlResult<()> {
+    let query = ProcQuery::new()
         .process_id(55932) // Get a process ID from somewhere
         .expect_min_num_children(1);
 
-query.children().unwrap();
+    query.children()?;
+    Ok(())
+}
 ```

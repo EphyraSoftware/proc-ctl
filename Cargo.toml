@@ -14,13 +14,17 @@ path = "./sample/port-binder/main.rs"
 name = "proc-runner"
 path = "./sample/proc-runner/main.rs"
 
+[[bin]]
+name = "waiter"
+path = "./sample/waiter/main.rs"
+
 [dependencies]
 netstat2 = "0.9.1"
 thiserror = "1"
 retry = { version = "2.0.0", optional = true }
 tokio = { version = "1", features = ["time"], optional = true }
 async-recursion = { version = "1", optional = true }
-sysinfo = { version = "0.28.4", optional = true }
+sysinfo = { version = "0.30.10", optional = true }
 once_cell = { version = "1.17.1", optional = true }
 
 [dev-dependencies]
@@ -40,8 +44,8 @@ async = [
     "dep:async-recursion"
 ]
 
-# Included as a default feature but because sysinfo is relatively heavy-weight to initialise, its behind a feature flag
-# to allow it to be disabled if desired.
+# Included as a default feature but because sysinfo is relatively heavy-weight to initialise, so it's behind a feature
+# flag to allow it to be disabled if desired.
 proc = [
     "dep:sysinfo",
     "dep:once_cell"

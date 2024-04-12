@@ -1,11 +1,10 @@
+use crate::common::{resolve_pid, MaybeHasPid};
+use crate::{Pid, ProcCtlError, ProcCtlResult};
 use std::path::PathBuf;
 use std::process::Child;
 use std::sync::Mutex;
-// Switch to `use std::sync::OnceLock;` on the next Rust release https://github.com/rust-lang/rust/issues/74465
-use crate::common::{resolve_pid, MaybeHasPid};
-use crate::{Pid, ProcCtlError, ProcCtlResult};
-use once_cell::sync::OnceCell;
-use sysinfo::{PidExt, Process, ProcessExt, ProcessRefreshKind, RefreshKind, System, SystemExt};
+use std::sync::OnceLock;
+use sysinfo::{Process, ProcessRefreshKind, RefreshKind, System};
 
 /// Information about a process
 #[derive(Debug, Clone)]
@@ -15,7 +14,7 @@ pub struct ProcInfo {
     /// The command used to launch the process
     pub cmd: Vec<String>,
     /// The path to the executable the process is running
-    pub exe: PathBuf,
+    pub exe: Option<PathBuf>,
     /// The process ID
     pub pid: Pid,
     /// Parent process ID if relevant
@@ -23,13 +22,14 @@ pub struct ProcInfo {
     /// Environment variables available to the process
     pub env: Vec<String>,
     /// The current working directory of the process
-    pub cwd: PathBuf,
+    pub cwd: Option<PathBuf>,
 }
 
 /// Get information about a process
 #[derive(Debug)]
 pub struct ProcQuery {
     process_id: Option<Pid>,
+    name: Option<String>,
     min_num_children: Option<usize>,
 }
 
@@ -38,15 +38,24 @@ impl ProcQuery {
     pub fn new() -> Self {
         ProcQuery {
             process_id: None,
+            name: None,
             min_num_children: None,
         }
     }
 
     /// Set the process ID to match
     ///
-    /// Either this function or `process_id_from_child` are required to be called before the query is usable.
+    /// One of this, [ProcQuery::process_name] or [ProcQuery::process_id_from_child] must be called before the query is usable.
     pub fn process_id(mut self, pid: Pid) -> Self {
         self.process_id = Some(pid);
+        self
+    }
+
+    /// Set the process name to match
+    ///
+    /// One of this, [ProcQuery::process_id] or [ProcQuery::process_id_from_child] must be called before the query is usable.
+    pub fn process_name(mut self, name: impl AsRef<str>) -> Self {
+        self.name = Some(name.as_ref().to_string());
         self
     }
 
@@ -61,6 +70,34 @@ impl ProcQuery {
     pub fn expect_min_num_children(mut self, num_children: usize) -> Self {
         self.min_num_children = Some(num_children);
         self
+    }
+
+    /// List all processes matching the current filters.
+    pub fn list_processes(&self) -> ProcCtlResult<Vec<ProcInfo>> {
+        let mut sys_handle = sys_handle().lock().unwrap();
+        sys_handle.refresh_processes();
+        let processes = sys_handle.processes();
+        let infos: Vec<ProcInfo> = processes
+            .values()
+            .filter(|p| {
+                if let Some(pid) = self.process_id {
+                    if p.pid().as_u32() != pid {
+                        return false;
+                    }
+                }
+
+                if let Some(name) = &self.name {
+                    if p.name() != name {
+                        return false;
+                    }
+                }
+
+                true
+            })
+            .map(|p| p.into())
+            .collect();
+
+        Ok(infos)
     }
 
     /// Find the children of the selected process
@@ -121,7 +158,7 @@ impl ProcQuery {
 }
 
 fn sys_handle() -> &'static Mutex<System> {
-    static SYS_HANDLE: OnceCell<Mutex<System>> = OnceCell::new();
+    static SYS_HANDLE: OnceLock<Mutex<System>> = OnceLock::new();
     SYS_HANDLE.get_or_init(|| {
         let mut sys = System::new_with_specifics(
             RefreshKind::new().with_processes(ProcessRefreshKind::new()),
@@ -137,11 +174,11 @@ impl From<&Process> for ProcInfo {
         ProcInfo {
             name: value.name().to_owned(),
             cmd: value.cmd().to_owned(),
-            exe: value.exe().to_owned(),
+            exe: value.exe().map(|p| p.to_owned()),
             pid: value.pid().as_u32() as Pid,
             parent: value.parent().map(|p| p.as_u32() as Pid),
             env: value.environ().to_owned(),
-            cwd: value.cwd().to_owned(),
+            cwd: value.cwd().map(|p| p.to_owned()),
         }
     }
 }

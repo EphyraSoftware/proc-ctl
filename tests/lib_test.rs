@@ -1,5 +1,5 @@
 use assert_cmd::cargo::CommandCargoExt;
-use proc_ctl::{PortQuery, ProcQuery};
+use proc_ctl::PortQuery;
 use retry::delay::Fixed;
 use retry::retry;
 use std::process::Command;
@@ -90,7 +90,28 @@ async fn port_query_with_async_retry() {
 
 #[cfg(feature = "proc")]
 #[test]
+fn proc_query_by_name() {
+    use proc_ctl::ProcQuery;
+
+    let mut binder = Command::cargo_bin("waiter").unwrap();
+    let mut handle = binder.spawn().unwrap();
+
+    let query = ProcQuery::new().process_name("waiter".to_string());
+
+    let processes = query.list_processes().unwrap();
+
+    handle.kill().unwrap();
+
+    println!("{:?}", processes);
+
+    assert_eq!(1, processes.len());
+}
+
+#[cfg(feature = "proc")]
+#[test]
 fn proc_query_for_children() {
+    use proc_ctl::ProcQuery;
+
     let binder = Command::cargo_bin("port-binder").unwrap();
     let port_binder_path = binder.get_program();
 
@@ -117,6 +138,7 @@ fn proc_query_for_children() {
 #[cfg(all(feature = "proc", feature = "resilience"))]
 #[test]
 fn proc_query_for_children_with_retry() {
+    use proc_ctl::ProcQuery;
     use std::time::Duration;
 
     let binder = Command::cargo_bin("port-binder").unwrap();
@@ -143,6 +165,7 @@ fn proc_query_for_children_with_retry() {
 #[cfg(all(feature = "proc", feature = "async"))]
 #[tokio::test]
 async fn proc_query_for_children_async_with_retry() {
+    use proc_ctl::ProcQuery;
     use std::time::Duration;
 
     let binder = Command::cargo_bin("port-binder").unwrap();
