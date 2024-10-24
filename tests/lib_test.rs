@@ -4,6 +4,7 @@ use retry::delay::Fixed;
 use retry::retry;
 use std::process::Command;
 
+#[cfg(target_os = "linux")]
 #[test]
 fn port_query() {
     let mut binder = Command::cargo_bin("port-binder").unwrap();
@@ -22,6 +23,7 @@ fn port_query() {
     assert_eq!(1, ports.len());
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 fn port_query_which_expects_too_many_ports() {
     let mut binder = Command::cargo_bin("port-binder").unwrap();
@@ -41,7 +43,7 @@ fn port_query_which_expects_too_many_ports() {
     result.expect_err("Should have had an error about too few ports");
 }
 
-#[cfg(feature = "resilience")]
+#[cfg(all(feature = "resilience", target_os = "linux"))]
 #[test]
 fn port_query_with_sync_retry() {
     use std::time::Duration;
@@ -64,7 +66,7 @@ fn port_query_with_sync_retry() {
     assert_eq!(1, ports.len());
 }
 
-#[cfg(feature = "async")]
+#[cfg(all(feature = "async", target_os = "linux"))]
 #[tokio::test]
 async fn port_query_with_async_retry() {
     use std::time::Duration;
