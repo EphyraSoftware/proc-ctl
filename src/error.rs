@@ -8,6 +8,7 @@ pub type ProcCtlResult<T> = Result<T, ProcCtlError>;
 #[derive(Error, Debug)]
 pub enum ProcCtlError {
     /// An error occurred while searching process information
+    #[cfg(target_os = "linux")]
     #[error("process error")]
     ProcessError(#[from] procfs::ProcError),
 
