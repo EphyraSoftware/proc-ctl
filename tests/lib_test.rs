@@ -1,5 +1,4 @@
 use assert_cmd::cargo::CommandCargoExt;
-use proc_ctl::PortQuery;
 use retry::delay::Fixed;
 use retry::retry;
 use std::process::Command;
@@ -10,7 +9,7 @@ fn port_query() {
     let mut binder = Command::cargo_bin("port-binder").unwrap();
     let mut handle = binder.spawn().unwrap();
 
-    let query = PortQuery::new()
+    let query = proc_ctl::PortQuery::new()
         .tcp_only()
         .ip_v4_only()
         .process_id(handle.id())
@@ -29,7 +28,7 @@ fn port_query_which_expects_too_many_ports() {
     let mut binder = Command::cargo_bin("port-binder").unwrap();
     let mut handle = binder.spawn().unwrap();
 
-    let query = PortQuery::new()
+    let query = proc_ctl::PortQuery::new()
         .tcp_only()
         .ip_v4_only()
         .process_id_from_child(&handle)
@@ -51,7 +50,7 @@ fn port_query_with_sync_retry() {
     let mut binder = Command::cargo_bin("port-binder").unwrap();
     let mut handle = binder.spawn().unwrap();
 
-    let query = PortQuery::new()
+    let query = proc_ctl::PortQuery::new()
         .tcp_only()
         .ip_v4_only()
         .process_id_from_child(&handle)
@@ -74,7 +73,7 @@ async fn port_query_with_async_retry() {
     let mut binder = Command::cargo_bin("port-binder").unwrap();
     let mut handle = binder.spawn().unwrap();
 
-    let query = PortQuery::new()
+    let query = proc_ctl::PortQuery::new()
         .tcp_only()
         .ip_v4_only()
         .process_id_from_child(&handle)
@@ -98,7 +97,7 @@ fn proc_query_by_name() {
     let mut binder = Command::cargo_bin("waiter").unwrap();
     let mut handle = binder.spawn().unwrap();
 
-    let query = ProcQuery::new().process_name("waiter".to_string());
+    let query = ProcQuery::new().process_name("waiter");
 
     let processes = query.list_processes().unwrap();
 
