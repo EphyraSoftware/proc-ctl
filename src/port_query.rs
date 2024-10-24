@@ -1,4 +1,4 @@
-use crate::common::{resolve_pid, MaybeHasPid};
+use crate::common::MaybeHasPid;
 use crate::error::{ProcCtlError, ProcCtlResult};
 use crate::types::{Pid, ProtocolPort};
 use std::process::Child;
@@ -79,7 +79,7 @@ impl PortQuery {
     /// Execute the query
     pub fn execute(&self) -> ProcCtlResult<Vec<ProtocolPort>> {
         #[cfg(target_os = "linux")]
-        let ports = list_ports_for_pid(self, resolve_pid(self)?)?;
+        let ports = list_ports_for_pid(self, crate::common::resolve_pid(self)?)?;
         #[cfg(not(target_os = "linux"))]
         let ports = Vec::with_capacity(0);
 
