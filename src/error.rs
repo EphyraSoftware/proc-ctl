@@ -7,9 +7,9 @@ pub type ProcCtlResult<T> = Result<T, ProcCtlError>;
 /// Custom error type for proc-ctl
 #[derive(Error, Debug)]
 pub enum ProcCtlError {
-    /// There was an error communicating with the network
-    #[error("network error")]
-    NetworkError(#[from] netstat2::error::Error),
+    /// An error occurred while searching process information
+    #[error("process error")]
+    ProcessError(#[from] procfs::ProcError),
 
     /// The user made an error using the API, a more specific error message will be provided
     #[error("configuration error {0}")]

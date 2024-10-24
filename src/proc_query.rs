@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::process::Child;
 use std::sync::Mutex;
 use std::sync::OnceLock;
-use sysinfo::{Process, ProcessRefreshKind, RefreshKind, System};
+use sysinfo::{Process, ProcessRefreshKind, ProcessesToUpdate, RefreshKind, System};
 
 /// Information about a process
 #[derive(Debug, Clone)]
@@ -75,7 +75,7 @@ impl ProcQuery {
     /// List all processes matching the current filters.
     pub fn list_processes(&self) -> ProcCtlResult<Vec<ProcInfo>> {
         let mut sys_handle = sys_handle().lock().unwrap();
-        sys_handle.refresh_processes();
+        sys_handle.refresh_processes(ProcessesToUpdate::All, true);
         let processes = sys_handle.processes();
         let infos: Vec<ProcInfo> = processes
             .values()
@@ -87,7 +87,7 @@ impl ProcQuery {
                 }
 
                 if let Some(name) = &self.name {
-                    if p.name() != name {
+                    if p.name().to_string_lossy().as_ref() != name {
                         return false;
                     }
                 }
@@ -105,7 +105,7 @@ impl ProcQuery {
         let pid = resolve_pid(self)?;
 
         let mut sys_handle = sys_handle().lock().unwrap();
-        sys_handle.refresh_processes();
+        sys_handle.refresh_processes(ProcessesToUpdate::All, true);
         let processes = sys_handle.processes();
         let children: Vec<ProcInfo> = processes
             .values()
@@ -163,7 +163,7 @@ fn sys_handle() -> &'static Mutex<System> {
         let mut sys = System::new_with_specifics(
             RefreshKind::new().with_processes(ProcessRefreshKind::new()),
         );
-        sys.refresh_processes();
+        sys.refresh_processes(ProcessesToUpdate::All, true);
 
         Mutex::new(sys)
     })
@@ -172,12 +172,20 @@ fn sys_handle() -> &'static Mutex<System> {
 impl From<&Process> for ProcInfo {
     fn from(value: &Process) -> Self {
         ProcInfo {
-            name: value.name().to_owned(),
-            cmd: value.cmd().to_owned(),
+            name: value.name().to_string_lossy().to_string(),
+            cmd: value
+                .cmd()
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
             exe: value.exe().map(|p| p.to_owned()),
             pid: value.pid().as_u32() as Pid,
             parent: value.parent().map(|p| p.as_u32() as Pid),
-            env: value.environ().to_owned(),
+            env: value
+                .environ()
+                .iter()
+                .map(|p| p.to_string_lossy().to_string())
+                .collect(),
             cwd: value.cwd().map(|p| p.to_owned()),
         }
     }

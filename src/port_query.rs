@@ -1,14 +1,15 @@
 use crate::common::{resolve_pid, MaybeHasPid};
 use crate::error::{ProcCtlError, ProcCtlResult};
 use crate::types::{Pid, ProtocolPort};
-use netstat2::{get_sockets_info, AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState};
 use std::process::Child;
 
 /// Find the ports used by a process
 #[derive(Debug)]
 pub struct PortQuery {
-    address_family_flags: AddressFamilyFlags,
-    proto_flags: ProtocolFlags,
+    ipv4_addresses: bool,
+    ipv6_addresses: bool,
+    tcp_addresses: bool,
+    udp_addresses: bool,
     process_id: Option<Pid>,
     min_num_ports: Option<usize>,
 }
@@ -17,8 +18,10 @@ impl PortQuery {
     /// Create a new query
     pub fn new() -> Self {
         PortQuery {
-            address_family_flags: AddressFamilyFlags::IPV4 | AddressFamilyFlags::IPV6,
-            proto_flags: ProtocolFlags::TCP | ProtocolFlags::UDP,
+            ipv4_addresses: true,
+            ipv6_addresses: true,
+            tcp_addresses: true,
+            udp_addresses: true,
             process_id: None,
             min_num_ports: None,
         }
@@ -26,25 +29,29 @@ impl PortQuery {
 
     /// Only consider IPv4 addresses
     pub fn ip_v4_only(mut self) -> Self {
-        self.address_family_flags = AddressFamilyFlags::IPV4;
+        self.ipv4_addresses = true;
+        self.ipv6_addresses = false;
         self
     }
 
     /// Only consider IPv6 addresses
     pub fn ip_v6_only(mut self) -> Self {
-        self.address_family_flags = AddressFamilyFlags::IPV6;
+        self.ipv4_addresses = false;
+        self.ipv6_addresses = true;
         self
     }
 
     /// Only consider TCP ports
     pub fn tcp_only(mut self) -> Self {
-        self.proto_flags = ProtocolFlags::TCP;
+        self.tcp_addresses = true;
+        self.udp_addresses = false;
         self
     }
 
     /// Only consider UDP ports
     pub fn udp_only(mut self) -> Self {
-        self.proto_flags = ProtocolFlags::UDP;
+        self.tcp_addresses = false;
+        self.udp_addresses = true;
         self
     }
 
@@ -69,13 +76,13 @@ impl PortQuery {
         self.process_id(child.id())
     }
 
-    /// Execute the query the query
+    /// Execute the query
     pub fn execute(&self) -> ProcCtlResult<Vec<ProtocolPort>> {
-        let ports = list_ports_for_pid(
-            self.address_family_flags,
-            self.proto_flags,
-            resolve_pid(self)?,
-        )?;
+        let ports = if cfg!(unix) {
+            list_ports_for_pid(self, resolve_pid(self)?)?
+        } else {
+            Vec::with_capacity(0)
+        };
 
         if let Some(num) = &self.min_num_ports {
             if ports.len() < *num {
@@ -121,32 +128,58 @@ impl PortQuery {
     }
 }
 
-fn list_ports_for_pid(
-    af_flags: AddressFamilyFlags,
-    proto_flags: ProtocolFlags,
-    pid: Pid,
-) -> ProcCtlResult<Vec<ProtocolPort>> {
-    let sockets_info = get_sockets_info(af_flags, proto_flags)?;
-
-    sockets_info
-        .iter()
-        .filter_map(|v| {
-            if v.associated_pids.contains(&pid) {
-                match &v.protocol_socket_info {
-                    ProtocolSocketInfo::Tcp(si) => {
-                        if si.state == TcpState::Listen {
-                            Some(Ok(ProtocolPort::Tcp(si.local_port)))
-                        } else {
-                            None
-                        }
-                    }
-                    ProtocolSocketInfo::Udp(si) => Some(Ok(ProtocolPort::Udp(si.local_port))),
+#[cfg(unix)]
+fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<ProtocolPort>> {
+    let proc = procfs::process::Process::new(pid as i32)?;
+    let fds = proc.fd()?;
+    let socket_nodes = fds
+        .filter_map(|fd| {
+            if let Ok(fd) = fd {
+                match fd.target {
+                    procfs::process::FDTarget::Socket(inode) => Some(inode),
+                    _ => None,
                 }
             } else {
                 None
             }
         })
-        .collect()
+        .collect::<std::collections::HashSet<_>>();
+
+    let mut out = Vec::new();
+
+    if query.tcp_addresses {
+        let mut tcp_entries = procfs::net::tcp()?;
+
+        if query.ipv6_addresses {
+            let tcp6_entries = procfs::net::tcp6()?;
+            tcp_entries.extend(tcp6_entries);
+        }
+
+        for entry in tcp_entries {
+            if entry.state == procfs::net::TcpState::Listen && socket_nodes.contains(&entry.inode) {
+                out.push(ProtocolPort::Tcp(entry.local_address.port()));
+            }
+        }
+    }
+
+    if query.udp_addresses {
+        let mut udp_entries = procfs::net::udp()?;
+
+        if query.ipv6_addresses {
+            let udp6_entries = procfs::net::udp6()?;
+            udp_entries.extend(udp6_entries);
+        }
+
+        for entry in udp_entries {
+            if entry.state == procfs::net::UdpState::Established
+                && socket_nodes.contains(&entry.inode)
+            {
+                out.push(ProtocolPort::Udp(entry.local_address.port()));
+            }
+        }
+    }
+
+    Ok(out)
 }
 
 impl MaybeHasPid for PortQuery {
