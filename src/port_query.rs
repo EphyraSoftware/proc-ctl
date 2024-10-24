@@ -78,7 +78,7 @@ impl PortQuery {
 
     /// Execute the query
     pub fn execute(&self) -> ProcCtlResult<Vec<ProtocolPort>> {
-        let ports = if cfg!(unix) {
+        let ports = if cfg!(target_os = "linux") {
             list_ports_for_pid(self, resolve_pid(self)?)?
         } else {
             Vec::with_capacity(0)
@@ -128,7 +128,7 @@ impl PortQuery {
     }
 }
 
-#[cfg(unix)]
+#[cfg(target_os = "linux")]
 fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<ProtocolPort>> {
     let proc = procfs::process::Process::new(pid as i32)?;
     let fds = proc.fd()?;
