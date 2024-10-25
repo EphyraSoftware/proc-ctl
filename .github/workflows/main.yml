@@ -31,9 +31,9 @@ jobs:
 
     - name: Run tests
       run: |-
-        cargo test
-        cargo test --no-default-features --test lib_test
-        cargo test --features resilience
-        cargo test --features async
-        cargo test --all-features
+        cargo test -- --test-threads=1
+        cargo test --no-default-features --test lib_test -- --test-threads=1
+        cargo test --features resilience -- --test-threads=1
+        cargo test --features async -- --test-threads=1
+        cargo test --all-features -- --test-threads=1
 
