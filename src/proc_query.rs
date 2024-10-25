@@ -55,7 +55,16 @@ impl ProcQuery {
     ///
     /// One of this, [ProcQuery::process_id] or [ProcQuery::process_id_from_child] must be called before the query is usable.
     pub fn process_name(mut self, name: impl AsRef<str>) -> Self {
-        self.name = Some(name.as_ref().to_string());
+        let name = name.as_ref().to_string();
+        #[cfg(target_os = "windows")]
+        let name = {
+            let mut name = name;
+            if !name.ends_with(".exe") {
+                name.push_str(".exe");
+            }
+            name
+        };
+        self.name = Some(name);
         self
     }
 

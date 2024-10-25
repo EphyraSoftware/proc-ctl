@@ -103,8 +103,6 @@ fn proc_query_by_name() {
 
     handle.kill().unwrap();
 
-    println!("{:?}", processes);
-
     assert_eq!(1, processes.len());
 }
 
@@ -133,6 +131,10 @@ fn proc_query_for_children() {
     handle.kill().unwrap();
 
     assert_eq!(1, process_names.len());
+
+    #[cfg(target_os = "windows")]
+    assert_eq!("port-binder.exe", process_names.first().unwrap());
+    #[cfg(not(target_os = "windows"))]
     assert_eq!("port-binder", process_names.first().unwrap());
 }
 
