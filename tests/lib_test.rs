@@ -1,7 +1,7 @@
-use std::io::Write;
 use assert_cmd::cargo::CommandCargoExt;
 use retry::delay::Fixed;
 use retry::retry;
+use std::io::Write;
 use std::process::Command;
 
 struct DropChild(std::process::Child);
@@ -128,12 +128,13 @@ fn proc_query_by_name() {
 
     let query = ProcQuery::new().process_name("waiter");
 
-    let processes = retry(Fixed::from_millis(100).take(1), move ||{
+    let processes = retry(Fixed::from_millis(100).take(1), move || {
         match query.list_processes().ok() {
-            Some(processes) if processes.len() > 0 => Ok(processes),
-            _ => Err("No processes found")
+            Some(processes) if !processes.is_empty() => Ok(processes),
+            _ => Err("No processes found"),
         }
-    }).expect("Failed to find process in time");
+    })
+    .expect("Failed to find process in time");
 
     if let Some(stdin) = handle.stdin.as_mut() {
         stdin.write_all(b"\r\n").unwrap();
