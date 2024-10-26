@@ -124,6 +124,9 @@ fn proc_query_by_name() {
 
     let _cmd = escargot::CargoBuild::new().bin("waiter").run().unwrap().command().spawn().unwrap();
 
+    let out = std::process::Command::new("pwsh.exe").arg("-Command").arg("ps").spawn().unwrap().wait_with_output().unwrap();
+    println!("out: {:?}", String::from_utf8_lossy(&out.stdout));
+
     let query = ProcQuery::new().process_name("waiter");
 
     let processes = retry(Fixed::from_millis(100).take(10), move || {
