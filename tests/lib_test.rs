@@ -131,7 +131,7 @@ fn proc_query_by_name() {
     let processes = query.list_processes().unwrap();
 
     if let Some(stdin) = handle.stdin.as_mut() {
-        stdin.write(b"\r\n").unwrap();
+        stdin.write_all(b"\r\n").unwrap();
     } else {
         handle.kill().unwrap();
     }
