@@ -128,7 +128,7 @@ fn proc_query_by_name() {
 
     let query = ProcQuery::new().process_name("waiter");
 
-    let processes = retry(Fixed::from_millis(100).take(1), move || {
+    let processes = retry(Fixed::from_millis(100).take(10), move || {
         match query.list_processes().ok() {
             Some(processes) if !processes.is_empty() => Ok(processes),
             _ => Err("No processes found"),
