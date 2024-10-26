@@ -1,7 +1,36 @@
+use std::io::Write;
 use assert_cmd::cargo::CommandCargoExt;
 use retry::delay::Fixed;
 use retry::retry;
 use std::process::Command;
+
+struct DropChild(std::process::Child);
+
+impl DropChild {
+    fn spawn(mut cmd: Command) -> Self {
+        DropChild(cmd.spawn().expect("Failed to spawn child process"))
+    }
+}
+
+impl Drop for DropChild {
+    fn drop(&mut self) {
+        self.0.kill().expect("Failed to kill child process");
+    }
+}
+
+impl std::ops::Deref for DropChild {
+    type Target = std::process::Child;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for DropChild {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 #[cfg(target_os = "linux")]
 #[test]
@@ -94,14 +123,18 @@ async fn port_query_with_async_retry() {
 fn proc_query_by_name() {
     use proc_ctl::ProcQuery;
 
-    let mut binder = Command::cargo_bin("waiter").unwrap();
-    let mut handle = binder.spawn().unwrap();
+    let binder = Command::cargo_bin("waiter").unwrap();
+    let mut handle = DropChild::spawn(binder);
 
     let query = ProcQuery::new().process_name("waiter");
 
     let processes = query.list_processes().unwrap();
 
-    handle.kill().unwrap();
+    if let Some(stdin) = handle.stdin.as_mut() {
+        stdin.write(b"\r\n").unwrap();
+    } else {
+        handle.kill().unwrap();
+    }
 
     assert_eq!(1, processes.len());
 }
@@ -115,7 +148,8 @@ fn proc_query_for_children() {
     let port_binder_path = binder.get_program();
 
     let mut runner = Command::cargo_bin("proc-runner").unwrap();
-    let mut handle = runner.args([port_binder_path]).spawn().unwrap();
+    runner.args([port_binder_path]);
+    let mut handle = DropChild::spawn(runner);
 
     let query = ProcQuery::new()
         .process_id_from_child(&handle)
@@ -148,7 +182,8 @@ fn proc_query_for_children_with_retry() {
     let port_binder_path = binder.get_program();
 
     let mut runner = Command::cargo_bin("proc-runner").unwrap();
-    let mut handle = runner.args([port_binder_path]).spawn().unwrap();
+    runner.args([port_binder_path]);
+    let mut handle = DropChild::spawn(runner);
 
     let process_names = ProcQuery::new()
         .process_id_from_child(&handle)
@@ -175,7 +210,8 @@ async fn proc_query_for_children_async_with_retry() {
     let port_binder_path = binder.get_program();
 
     let mut runner = Command::cargo_bin("proc-runner").unwrap();
-    let mut handle = runner.args([port_binder_path]).spawn().unwrap();
+    runner.args([port_binder_path]);
+    let mut handle = DropChild::spawn(runner);
 
     let process_names = ProcQuery::new()
         .process_id_from_child(&handle)
