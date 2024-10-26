@@ -1,7 +1,6 @@
 use assert_cmd::cargo::CommandCargoExt;
 use retry::delay::Fixed;
 use retry::retry;
-use std::io::Write;
 use std::process::Command;
 
 struct DropChild(std::process::Child);
@@ -123,24 +122,17 @@ async fn port_query_with_async_retry() {
 fn proc_query_by_name() {
     use proc_ctl::ProcQuery;
 
-    let binder = Command::cargo_bin("waiter").unwrap();
-    let mut handle = DropChild::spawn(binder);
+    let _cmd = escargot::CargoBuild::new().bin("waiter").run().unwrap().command().spawn().unwrap();
 
     let query = ProcQuery::new().process_name("waiter");
 
-    let processes = retry(Fixed::from_millis(100).take(1000), move || {
+    let processes = retry(Fixed::from_millis(100).take(10), move || {
         match query.list_processes().ok() {
             Some(processes) if !processes.is_empty() => Ok(processes),
             _ => Err("No processes found"),
         }
     })
-    .expect("Failed to find process in time");
-
-    if let Some(stdin) = handle.stdin.as_mut() {
-        stdin.write_all(b"\r\n").unwrap();
-    } else {
-        handle.kill().unwrap();
-    }
+        .expect("Failed to find process in time");
 
     assert_eq!(1, processes.len());
 }
@@ -166,7 +158,7 @@ fn proc_query_for_children() {
             .children()
             .map(|v| v.into_iter().map(|p| p.name).collect::<Vec<String>>())
     })
-    .unwrap();
+        .unwrap();
 
     handle.kill().unwrap();
 
