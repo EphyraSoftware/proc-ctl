@@ -32,7 +32,10 @@ jobs:
     - name: Run tests
       shell: pwsh
       run: |-
+        ps
         Start-Process -NoNewWindow -FilePath "pwsh.exe" -ArgumentList "-Command","Start-Sleep","-Seconds","300"
+        echo "after"
+        ps
         cargo test -- --test-threads=1
         cargo test --no-default-features --test lib_test -- --test-threads=1
         cargo test --features resilience -- --test-threads=1
