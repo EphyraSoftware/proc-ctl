@@ -128,7 +128,12 @@ fn proc_query_by_name() {
 
     let query = ProcQuery::new().process_name("waiter");
 
-    let processes = query.list_processes().unwrap();
+    let processes = retry(Fixed::from_millis(100).take(1), move ||{
+        match query.list_processes().ok() {
+            Some(processes) if processes.len() > 0 => Ok(processes),
+            _ => Err("No processes found")
+        }
+    }).expect("Failed to find process in time");
 
     if let Some(stdin) = handle.stdin.as_mut() {
         stdin.write_all(b"\r\n").unwrap();
