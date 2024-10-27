@@ -1,7 +1,7 @@
 use assert_cmd::cargo::CommandCargoExt;
 use retry::delay::Fixed;
 use retry::retry;
-use std::process::Command;
+use std::process::{Command, Stdio};
 
 struct DropChild(std::process::Child);
 
@@ -122,9 +122,22 @@ async fn port_query_with_async_retry() {
 fn proc_query_by_name() {
     use proc_ctl::ProcQuery;
 
-    let _cmd = escargot::CargoBuild::new().bin("waiter").run().unwrap().command().spawn().unwrap();
+    let mut cmd = escargot::CargoBuild::new()
+        .bin("waiter")
+        .run()
+        .unwrap()
+        .command()
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
 
-    let out = std::process::Command::new("pwsh.exe").arg("-Command").arg("ps").spawn().unwrap().wait_with_output().unwrap();
+    let out = std::process::Command::new("pwsh.exe")
+        .arg("-Command")
+        .arg("ps")
+        .spawn()
+        .unwrap()
+        .wait_with_output()
+        .unwrap();
     println!("out: {:?}", String::from_utf8_lossy(&out.stdout));
 
     let query = ProcQuery::new().process_name("waiter");
@@ -135,7 +148,9 @@ fn proc_query_by_name() {
             _ => Err("No processes found"),
         }
     })
-        .expect("Failed to find process in time");
+    .expect("Failed to find process in time");
+
+    cmd.kill().unwrap();
 
     assert_eq!(1, processes.len());
 }
@@ -161,7 +176,7 @@ fn proc_query_for_children() {
             .children()
             .map(|v| v.into_iter().map(|p| p.name).collect::<Vec<String>>())
     })
-        .unwrap();
+    .unwrap();
 
     handle.kill().unwrap();
 
