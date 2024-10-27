@@ -127,7 +127,8 @@ fn proc_query_by_name() {
         .run()
         .unwrap()
         .command()
-        .stdout(Stdio::piped())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::inherit())
         .spawn()
         .unwrap();
 
