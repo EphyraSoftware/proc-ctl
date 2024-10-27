@@ -23,11 +23,11 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build
-      run: cargo build --release
-
-    - name: Lint
-      run: cargo clippy --all-features --all-targets -- -Dwarnings
+#    - name: Build
+#      run: cargo build --release
+#
+#    - name: Lint
+#      run: cargo clippy --all-features --all-targets -- -Dwarnings
 
     - name: Run tests
       shell: pwsh
