@@ -2,5 +2,7 @@ use std::io::stdin;
 
 fn main() {
     println!("Waiting");
-    stdin().read_line(&mut String::new()).unwrap();
+    let buf = &mut String::new();
+    stdin().read_line(buf).unwrap();
+    println!("Waiting done with input: [{}]", buf);
 }
