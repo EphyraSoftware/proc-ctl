@@ -1,4 +1,3 @@
-use crate::common::MaybeHasPid;
 use crate::error::{ProcCtlError, ProcCtlResult};
 use crate::types::{Pid, ProtocolPort};
 use std::process::Child;
@@ -181,7 +180,8 @@ fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<Protocol
     Ok(out)
 }
 
-impl MaybeHasPid for PortQuery {
+#[cfg(any(target_os = "linux", feature = "proc"))]
+impl crate::common::MaybeHasPid for PortQuery {
     fn get_pid(&self) -> Option<Pid> {
         self.process_id
     }

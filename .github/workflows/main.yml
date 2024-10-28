@@ -23,14 +23,24 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build
-      run: cargo build --release
+    - uses: Swatinem/rust-cache@v2
+
+    - name: Check formatting
+      run: cargo fmt --all -- --check
 
     - name: Lint
-      run: cargo clippy --all-features --all-targets -- -Dwarnings
+      run: |
+        cargo clippy --all-targets -- -Dwarnings
+        cargo clippy --no-default-features --all-targets -- -Dwarnings
+        cargo clippy --features resilience --all-targets -- -Dwarnings
+        cargo clippy --features async --all-targets -- -Dwarnings
+        cargo clippy --all-features --all-targets -- -Dwarnings
 
     - name: Run tests
       run: |-
+        # Create test binaries
+        cargo build --release --bins
+        
         cargo test -- --test-threads=1
         cargo test --no-default-features --test lib_test -- --test-threads=1
         cargo test --features resilience -- --test-threads=1

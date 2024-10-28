@@ -84,12 +84,13 @@ impl ProcQuery {
     /// List all processes matching the current filters.
     pub fn list_processes(&self) -> ProcCtlResult<Vec<ProcInfo>> {
         let mut sys_handle = sys_handle().lock().unwrap();
-        sys_handle.refresh_processes(ProcessesToUpdate::All, true);
-        let processes = sys_handle.processes();
-        println!(
-            "Found processes: {:?}, \r\n\r\n while looking for {:?}",
-            processes, self.name
+        sys_handle.refresh_processes_specifics(
+            ProcessesToUpdate::All,
+            true,
+            ProcessRefreshKind::everything(),
         );
+        let processes = sys_handle.processes();
+
         let infos: Vec<ProcInfo> = processes
             .values()
             .filter(|p| {
