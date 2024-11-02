@@ -12,6 +12,11 @@ pub enum ProcCtlError {
     #[error("process error")]
     ProcessError(#[from] procfs::ProcError),
 
+    /// An error occurred while searching process information
+    #[cfg(target_os = "windows")]
+    #[error("process error")]
+    ProcessError(String),
+
     /// The user made an error using the API, a more specific error message will be provided
     #[error("configuration error {0}")]
     ConfigurationError(String),

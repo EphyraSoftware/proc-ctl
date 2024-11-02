@@ -1,4 +1,4 @@
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
 fn create_command_for_sample(name: &str) -> std::process::Command {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("target")
@@ -17,24 +17,24 @@ fn create_command_for_sample(name: &str) -> std::process::Command {
     std::process::Command::new(path)
 }
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
 struct DropChild(std::process::Child);
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
 impl DropChild {
     fn spawn(mut cmd: std::process::Command) -> Self {
         DropChild(cmd.spawn().expect("Failed to spawn child process"))
     }
 }
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
 impl Drop for DropChild {
     fn drop(&mut self) {
         self.0.kill().expect("Failed to kill child process");
     }
 }
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
 impl std::ops::Deref for DropChild {
     type Target = std::process::Child;
 
@@ -43,14 +43,14 @@ impl std::ops::Deref for DropChild {
     }
 }
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
 impl std::ops::DerefMut for DropChild {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 #[test]
 fn port_query() {
     use retry::delay::Fixed;
@@ -71,7 +71,7 @@ fn port_query() {
     assert_eq!(1, ports.len());
 }
 
-#[cfg(target_os = "linux")]
+#[cfg(any(target_os = "linux", target_os = "windows"))]
 #[test]
 fn port_query_which_expects_too_many_ports() {
     use retry::delay::Fixed;
@@ -93,7 +93,10 @@ fn port_query_which_expects_too_many_ports() {
     result.expect_err("Should have had an error about too few ports");
 }
 
-#[cfg(all(feature = "resilience", target_os = "linux"))]
+#[cfg(all(
+    feature = "resilience",
+    any(target_os = "linux", target_os = "windows")
+))]
 #[test]
 fn port_query_with_sync_retry() {
     use std::time::Duration;
@@ -116,7 +119,7 @@ fn port_query_with_sync_retry() {
     assert_eq!(1, ports.len());
 }
 
-#[cfg(all(feature = "async", target_os = "linux"))]
+#[cfg(all(feature = "async", any(target_os = "linux", target_os = "windows")))]
 #[tokio::test]
 async fn port_query_with_async_retry() {
     use std::time::Duration;
