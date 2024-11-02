@@ -1,9 +1,9 @@
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(target_os = "linux", target_os = "windows", feature = "proc"))]
 pub(crate) trait MaybeHasPid {
     fn get_pid(&self) -> Option<crate::Pid>;
 }
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(any(target_os = "linux", target_os = "windows", feature = "proc"))]
 pub(crate) fn resolve_pid(maybe_has_pid: &dyn MaybeHasPid) -> crate::ProcCtlResult<crate::Pid> {
     match &maybe_has_pid.get_pid() {
         Some(pid) => Ok(*pid),

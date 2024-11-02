@@ -77,9 +77,9 @@ impl PortQuery {
 
     /// Execute the query
     pub fn execute(&self) -> ProcCtlResult<Vec<ProtocolPort>> {
-        #[cfg(target_os = "linux")]
+        #[cfg(any(target_os = "linux", target_os = "windows"))]
         let ports = list_ports_for_pid(self, crate::common::resolve_pid(self)?)?;
-        #[cfg(not(target_os = "linux"))]
+        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
         let ports = Vec::with_capacity(0);
 
         if let Some(num) = &self.min_num_ports {
@@ -180,7 +180,151 @@ fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<Protocol
     Ok(out)
 }
 
-#[cfg(any(target_os = "linux", feature = "proc"))]
+#[cfg(target_os = "windows")]
+fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<ProtocolPort>> {
+    let mut out = Vec::new();
+
+    if query.tcp_addresses {
+        if query.ipv4_addresses {
+            let mut table = load_tcp_table(windows::Win32::Networking::WinSock::AF_INET)?;
+            let table: &mut windows::Win32::NetworkManagement::IpHelper::MIB_TCPTABLE_OWNER_PID = unsafe {
+                &mut *(table.as_mut_ptr()
+                    as *mut windows::Win32::NetworkManagement::IpHelper::MIB_TCPTABLE_OWNER_PID)
+            };
+
+            for i in 0..table.dwNumEntries as usize {
+                let row = unsafe { &*table.table.as_mut_ptr().add(i) };
+                if row.dwOwningPid == pid {
+                    out.push(ProtocolPort::Tcp(row.dwLocalPort as u16));
+                }
+            }
+        }
+        if query.ipv6_addresses {
+            let mut table = load_tcp_table(windows::Win32::Networking::WinSock::AF_INET6)?;
+            let table: &mut windows::Win32::NetworkManagement::IpHelper::MIB_TCP6TABLE_OWNER_PID = unsafe {
+                &mut *(table.as_mut_ptr()
+                    as *mut windows::Win32::NetworkManagement::IpHelper::MIB_TCP6TABLE_OWNER_PID)
+            };
+
+            for i in 0..table.dwNumEntries as usize {
+                let row = unsafe { &*table.table.as_mut_ptr().add(i) };
+                if row.dwOwningPid == pid {
+                    out.push(ProtocolPort::Tcp(row.dwLocalPort as u16));
+                }
+            }
+        }
+    }
+    if query.udp_addresses {
+        if query.ipv4_addresses {
+            let mut table = load_udp_table(windows::Win32::Networking::WinSock::AF_INET)?;
+            let table: &mut windows::Win32::NetworkManagement::IpHelper::MIB_UDPTABLE_OWNER_PID = unsafe {
+                &mut *(table.as_mut_ptr()
+                    as *mut windows::Win32::NetworkManagement::IpHelper::MIB_UDPTABLE_OWNER_PID)
+            };
+
+            for i in 0..table.dwNumEntries as usize {
+                let row = unsafe { &*table.table.as_mut_ptr().add(i) };
+                if row.dwOwningPid == pid {
+                    out.push(ProtocolPort::Tcp(row.dwLocalPort as u16));
+                }
+            }
+        }
+        if query.ipv6_addresses {
+            let mut table = load_udp_table(windows::Win32::Networking::WinSock::AF_INET6)?;
+            let table: &mut windows::Win32::NetworkManagement::IpHelper::MIB_UDP6TABLE_OWNER_PID = unsafe {
+                &mut *(table.as_mut_ptr()
+                    as *mut windows::Win32::NetworkManagement::IpHelper::MIB_UDP6TABLE_OWNER_PID)
+            };
+
+            for i in 0..table.dwNumEntries as usize {
+                let row = unsafe { &*table.table.as_mut_ptr().add(i) };
+                if row.dwOwningPid == pid {
+                    out.push(ProtocolPort::Tcp(row.dwLocalPort as u16));
+                }
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+#[cfg(target_os = "windows")]
+fn load_tcp_table(
+    family: windows::Win32::Networking::WinSock::ADDRESS_FAMILY,
+) -> ProcCtlResult<Vec<u8>> {
+    let mut table = Vec::<u8>::with_capacity(0);
+    let mut table_size: u32 = 0;
+    for _ in 0..3 {
+        let err_code = unsafe {
+            windows::Win32::Foundation::WIN32_ERROR(
+                windows::Win32::NetworkManagement::IpHelper::GetExtendedTcpTable(
+                    Some(table.as_mut_ptr() as *mut _),
+                    &mut table_size,
+                    false,
+                    family.0 as u32,
+                    windows::Win32::NetworkManagement::IpHelper::TCP_TABLE_OWNER_PID_ALL,
+                    0,
+                ),
+            )
+        };
+
+        if err_code == windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER {
+            table.resize(table_size as usize, 0);
+            continue;
+        } else if err_code != windows::Win32::Foundation::NO_ERROR {
+            return Err(ProcCtlError::ProcessError(format!(
+                "Failed to get TCP table: {:?}",
+                err_code
+            )));
+        }
+
+        return Ok(table);
+    }
+
+    Err(ProcCtlError::ProcessError(
+        "Failed to get TCP table".to_string(),
+    ))
+}
+
+#[cfg(target_os = "windows")]
+fn load_udp_table(
+    family: windows::Win32::Networking::WinSock::ADDRESS_FAMILY,
+) -> ProcCtlResult<Vec<u8>> {
+    let mut table = Vec::<u8>::with_capacity(0);
+    let mut table_size: u32 = 0;
+    for _ in 0..3 {
+        let err_code = unsafe {
+            windows::Win32::Foundation::WIN32_ERROR(
+                windows::Win32::NetworkManagement::IpHelper::GetExtendedUdpTable(
+                    Some(table.as_mut_ptr() as *mut _),
+                    &mut table_size,
+                    false,
+                    family.0 as u32,
+                    windows::Win32::NetworkManagement::IpHelper::UDP_TABLE_OWNER_PID,
+                    0,
+                ),
+            )
+        };
+
+        if err_code == windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER {
+            table.resize(table_size as usize, 0);
+            continue;
+        } else if err_code != windows::Win32::Foundation::NO_ERROR {
+            return Err(ProcCtlError::ProcessError(format!(
+                "Failed to get UDP table: {:?}",
+                err_code
+            )));
+        }
+
+        return Ok(table);
+    }
+
+    Err(ProcCtlError::ProcessError(
+        "Failed to get UDP table".to_string(),
+    ))
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows", feature = "proc"))]
 impl crate::common::MaybeHasPid for PortQuery {
     fn get_pid(&self) -> Option<Pid> {
         self.process_id
