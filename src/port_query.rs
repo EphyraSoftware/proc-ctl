@@ -146,10 +146,11 @@ fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<Protocol
     let mut out = Vec::new();
 
     if query.tcp_addresses {
-        let mut tcp_entries = procfs::net::tcp()?;
+        let mut tcp_entries = proc.tcp()?;
 
         if query.ipv6_addresses {
-            let tcp6_entries = procfs::net::tcp6()?;
+            let tcp6_entries = proc.tcp6()?;
+
             tcp_entries.extend(tcp6_entries);
         }
 
@@ -161,17 +162,15 @@ fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<Protocol
     }
 
     if query.udp_addresses {
-        let mut udp_entries = procfs::net::udp()?;
+        let mut udp_entries = proc.udp()?;
 
         if query.ipv6_addresses {
-            let udp6_entries = procfs::net::udp6()?;
+            let udp6_entries = proc.udp6()?;
             udp_entries.extend(udp6_entries);
         }
 
         for entry in udp_entries {
-            if entry.state == procfs::net::UdpState::Established
-                && socket_nodes.contains(&entry.inode)
-            {
+            if socket_nodes.contains(&entry.inode) {
                 out.push(ProtocolPort::Udp(entry.local_address.port()));
             }
         }
