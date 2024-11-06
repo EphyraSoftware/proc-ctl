@@ -13,7 +13,7 @@ pub enum ProcCtlError {
     ProcessError(#[from] procfs::ProcError),
 
     /// An error occurred while searching process information
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "macos"))]
     #[error("process error")]
     ProcessError(String),
 

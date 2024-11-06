@@ -77,9 +77,9 @@ impl PortQuery {
 
     /// Execute the query
     pub fn execute(&self) -> ProcCtlResult<Vec<ProtocolPort>> {
-        #[cfg(any(target_os = "linux", target_os = "windows"))]
+        #[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
         let ports = list_ports_for_pid(self, crate::common::resolve_pid(self)?)?;
-        #[cfg(not(any(target_os = "linux", target_os = "windows")))]
+        #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
         let ports = Vec::with_capacity(0);
 
         if let Some(num) = &self.min_num_ports {
@@ -324,7 +324,232 @@ fn load_udp_table(
     ))
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows", feature = "proc"))]
+#[cfg(target_os = "macos")]
+fn list_ports_for_pid(query: &PortQuery, pid: Pid) -> ProcCtlResult<Vec<ProtocolPort>> {
+    let mut out = Vec::new();
+
+    if query.ipv4_addresses {
+        if query.tcp_addresses {
+            match std::process::Command::new("lsof")
+                .arg("-a")
+                .arg("-iTCP")
+                .arg("-i4")
+                .arg("-sTCP:LISTEN")
+                .arg("-nP")
+                .arg("-F0pn")
+                .output()
+            {
+                Ok(output) => out.extend(
+                    find_ports_v4(output.stdout.clone(), pid)
+                        .into_iter()
+                        .map(ProtocolPort::Tcp),
+                ),
+                Err(e) => return Err(ProcCtlError::ProcessError(e.to_string())),
+            }
+        }
+        if query.udp_addresses {
+            match std::process::Command::new("lsof")
+                .arg("-a")
+                .arg("-iUDP")
+                .arg("-i4")
+                .arg("-nP")
+                .arg("-F0pn")
+                .output()
+            {
+                Ok(output) => out.extend(
+                    find_ports_v4(output.stdout.clone(), pid)
+                        .into_iter()
+                        .map(ProtocolPort::Udp),
+                ),
+                Err(e) => return Err(ProcCtlError::ProcessError(e.to_string())),
+            }
+        }
+    }
+    if query.ipv6_addresses {
+        if query.tcp_addresses {
+            match std::process::Command::new("lsof")
+                .arg("-a")
+                .arg("-iTCP")
+                .arg("-i6")
+                .arg("-sTCP:LISTEN")
+                .arg("-nP")
+                .arg("-F0pn")
+                .output()
+            {
+                Ok(output) => out.extend(
+                    find_ports_v6(output.stdout.clone(), pid)
+                        .into_iter()
+                        .map(ProtocolPort::Tcp),
+                ),
+                Err(e) => return Err(ProcCtlError::ProcessError(e.to_string())),
+            }
+        }
+        if query.udp_addresses {
+            match std::process::Command::new("lsof")
+                .arg("-a")
+                .arg("-iUDP")
+                .arg("-i6")
+                .arg("-nP")
+                .arg("-F0pn")
+                .output()
+            {
+                Ok(output) => out.extend(
+                    find_ports_v6(output.stdout.clone(), pid)
+                        .into_iter()
+                        .map(ProtocolPort::Udp),
+                ),
+                Err(e) => return Err(ProcCtlError::ProcessError(e.to_string())),
+            }
+        }
+    }
+
+    Ok(out)
+}
+
+#[cfg(target_os = "macos")]
+fn find_ports_v4(output: Vec<u8>, find_pid: Pid) -> Vec<u16> {
+    let mut out = Vec::new();
+
+    let mut index = 0;
+    let len = output.len();
+    while index < len {
+        if output[index] != b'p' {
+            break;
+        }
+        index += 1;
+
+        let start_pid = index;
+        while index < len && output[index] != 0 {
+            index += 1;
+        }
+
+        let Some(pid) = String::from_utf8_lossy(&output[start_pid..index])
+            .parse::<u32>()
+            .ok()
+        else {
+            break;
+        };
+        index += 1; // 0
+        index += 1; // NL
+
+        loop {
+            if pid == find_pid && index < len && output[index] == b'n' {
+                while index < len && output[index] != b':' {
+                    index += 1;
+                }
+                index += 1; // :
+
+                let start_port = index;
+                while index < len && output[index] != 0 {
+                    index += 1;
+                }
+
+                if index >= len {
+                    break;
+                }
+
+                if let Ok(port) = String::from_utf8_lossy(&output[start_port..index]).parse::<u16>()
+                {
+                    out.push(port);
+                };
+                index += 1; // 0
+            } else {
+                while index < len && output[index] != 0 {
+                    index += 1;
+                }
+                index += 1; // 0
+            }
+
+            if index < len && output[index] == 10 {
+                // NL
+                index += 1;
+            }
+
+            if index >= len || output[index] == b'p' {
+                break;
+            }
+        }
+    }
+
+    out
+}
+
+#[cfg(target_os = "macos")]
+fn find_ports_v6(output: Vec<u8>, find_pid: Pid) -> Vec<u16> {
+    let mut out = Vec::new();
+
+    let mut index = 0;
+    let len = output.len();
+    while index < len {
+        if output[index] != b'p' {
+            break;
+        }
+        index += 1;
+
+        let start_pid = index;
+        while index < len && output[index] != 0 {
+            index += 1;
+        }
+
+        let Ok(pid) = String::from_utf8_lossy(&output[start_pid..index]).parse::<u32>() else {
+            break;
+        };
+        index += 1; // 0
+        index += 1; // NL
+
+        loop {
+            if pid == find_pid && index < len && output[index] == b'n' {
+                while index < len && output[index] != b']' {
+                    index += 1;
+                }
+                index += 1; // ]
+
+                if index < len && output[index] != b':' {
+                    break;
+                }
+                index += 1;
+
+                let start_port = index;
+                while index < len && output[index] != 0 {
+                    index += 1;
+                }
+
+                if index >= len {
+                    break;
+                }
+
+                if let Ok(port) = String::from_utf8_lossy(&output[start_port..index]).parse::<u16>()
+                {
+                    out.push(port);
+                };
+                index += 1; // 0
+            } else {
+                while index < len && output[index] != 0 {
+                    index += 1;
+                }
+                index += 1; // 0
+            }
+
+            if index < len && output[index] == 10 {
+                // NL
+                index += 1;
+            }
+
+            if index >= len || output[index] == b'p' {
+                break;
+            }
+        }
+    }
+
+    out
+}
+
+#[cfg(any(
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos",
+    feature = "proc"
+))]
 impl crate::common::MaybeHasPid for PortQuery {
     fn get_pid(&self) -> Option<Pid> {
         self.process_id
