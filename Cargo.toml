@@ -15,8 +15,32 @@ doctest = false
 bench = false
 
 [[bin]]
+name = "port-binder-v6"
+path = "./sample/port-binder-v6/main.rs"
+test = false
+doc = false
+doctest = false
+bench = false
+
+[[bin]]
 name = "proc-runner"
 path = "./sample/proc-runner/main.rs"
+test = false
+doc = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "udp-port-binder"
+path = "./sample/udp-port-binder/main.rs"
+test = false
+doc = false
+doctest = false
+bench = false
+
+[[bin]]
+name = "udp-port-binder-v6"
+path = "./sample/udp-port-binder-v6/main.rs"
 test = false
 doc = false
 doctest = false

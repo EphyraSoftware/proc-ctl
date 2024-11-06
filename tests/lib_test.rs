@@ -1,4 +1,9 @@
-#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
+#[cfg(any(
+    feature = "proc",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 fn create_command_for_sample(name: &str) -> std::process::Command {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("target")
@@ -17,24 +22,44 @@ fn create_command_for_sample(name: &str) -> std::process::Command {
     std::process::Command::new(path)
 }
 
-#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
+#[cfg(any(
+    feature = "proc",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 struct DropChild(std::process::Child);
 
-#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
+#[cfg(any(
+    feature = "proc",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 impl DropChild {
     fn spawn(mut cmd: std::process::Command) -> Self {
         DropChild(cmd.spawn().expect("Failed to spawn child process"))
     }
 }
 
-#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
+#[cfg(any(
+    feature = "proc",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 impl Drop for DropChild {
     fn drop(&mut self) {
         self.0.kill().expect("Failed to kill child process");
     }
 }
 
-#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
+#[cfg(any(
+    feature = "proc",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 impl std::ops::Deref for DropChild {
     type Target = std::process::Child;
 
@@ -43,16 +68,21 @@ impl std::ops::Deref for DropChild {
     }
 }
 
-#[cfg(any(feature = "proc", target_os = "linux", target_os = "windows"))]
+#[cfg(any(
+    feature = "proc",
+    target_os = "linux",
+    target_os = "windows",
+    target_os = "macos"
+))]
 impl std::ops::DerefMut for DropChild {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.0
     }
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 #[test]
-fn port_query() {
+fn tcp_port_query_v4() {
     use retry::delay::Fixed;
 
     let binder = create_command_for_sample("port-binder");
@@ -71,7 +101,70 @@ fn port_query() {
     assert_eq!(1, ports.len());
 }
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+#[test]
+fn tcp_port_query_v6() {
+    use retry::delay::Fixed;
+
+    let binder = create_command_for_sample("port-binder-v6");
+    let mut handle = DropChild::spawn(binder);
+
+    let query = proc_ctl::PortQuery::new()
+        .tcp_only()
+        .ip_v6_only()
+        .process_id(handle.id())
+        .expect_min_num_ports(1);
+
+    let ports = retry::retry(Fixed::from_millis(100).take(10), move || query.execute()).unwrap();
+
+    handle.kill().unwrap();
+
+    assert_eq!(1, ports.len());
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+#[test]
+fn udp_port_query_v4() {
+    use retry::delay::Fixed;
+
+    let binder = create_command_for_sample("udp-port-binder");
+    let mut handle = DropChild::spawn(binder);
+
+    let query = proc_ctl::PortQuery::new()
+        .udp_only()
+        .ip_v4_only()
+        .process_id(handle.id())
+        .expect_min_num_ports(1);
+
+    let ports = retry::retry(Fixed::from_millis(100).take(10), move || query.execute()).unwrap();
+
+    handle.kill().unwrap();
+
+    assert_eq!(1, ports.len());
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
+#[test]
+fn udp_port_query_v6() {
+    use retry::delay::Fixed;
+
+    let binder = create_command_for_sample("udp-port-binder-v6");
+    let mut handle = DropChild::spawn(binder);
+
+    let query = proc_ctl::PortQuery::new()
+        .udp_only()
+        .ip_v6_only()
+        .process_id(handle.id())
+        .expect_min_num_ports(1);
+
+    let ports = retry::retry(Fixed::from_millis(100).take(10), move || query.execute()).unwrap();
+
+    handle.kill().unwrap();
+
+    assert_eq!(1, ports.len());
+}
+
+#[cfg(any(target_os = "linux", target_os = "windows", target_os = "macos"))]
 #[test]
 fn port_query_which_expects_too_many_ports() {
     use retry::delay::Fixed;
@@ -95,7 +188,7 @@ fn port_query_which_expects_too_many_ports() {
 
 #[cfg(all(
     feature = "resilience",
-    any(target_os = "linux", target_os = "windows")
+    any(target_os = "linux", target_os = "windows", target_os = "macos")
 ))]
 #[test]
 fn port_query_with_sync_retry() {
@@ -119,7 +212,10 @@ fn port_query_with_sync_retry() {
     assert_eq!(1, ports.len());
 }
 
-#[cfg(all(feature = "async", any(target_os = "linux", target_os = "windows")))]
+#[cfg(all(
+    feature = "async",
+    any(target_os = "linux", target_os = "windows", target_os = "macos")
+))]
 #[tokio::test]
 async fn port_query_with_async_retry() {
     use std::time::Duration;
