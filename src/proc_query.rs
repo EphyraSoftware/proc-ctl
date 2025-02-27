@@ -94,6 +94,11 @@ impl ProcQuery {
         let infos: Vec<ProcInfo> = processes
             .values()
             .filter(|p| {
+                // Should ignore threads, we're only looking for top-level processes.
+                if p.thread_kind().is_some() {
+                    return false;
+                }
+
                 if let Some(pid) = self.process_id {
                     if p.pid().as_u32() != pid {
                         return false;
